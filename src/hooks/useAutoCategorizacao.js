@@ -1,7 +1,6 @@
 import { useState, useEffect } from 'react';
 import { collection, getDocs } from 'firebase/firestore';
 import { db } from '../firebase-config';
-import { callChatGPTAPI } from '../services/chatGPTService';
 
 const useAutoCategorizacao = () => {
   const [categorias, setCategorias] = useState([]);
@@ -27,15 +26,18 @@ const useAutoCategorizacao = () => {
       }
     }
 
-    // Se não encontrar uma categoria, usa a IA para sugerir uma
-    const prompt = `Categorize a seguinte transação financeira: 
-    Descrição: "${descricao}", 
-    Valor: R$${Math.abs(valor)}, 
-    Tipo: ${tipo} (${valor >= 0 ? 'ganho' : 'gasto'}). 
-    Responda apenas com o nome da categoria mais apropriada.`;
-
-    const sugestao = await callChatGPTAPI(prompt);
-    return sugestao.trim();
+    // Se não encontrar uma categoria, usa uma lógica simples de categorização
+    if (tipo === 'ganho') {
+      return 'Renda';
+    } else if (valor > 1000) {
+      return 'Despesa Grande';
+    } else if (descricao.toLowerCase().includes('mercado') || descricao.toLowerCase().includes('supermercado')) {
+      return 'Alimentação';
+    } else if (descricao.toLowerCase().includes('conta') || descricao.toLowerCase().includes('fatura')) {
+      return 'Contas';
+    } else {
+      return 'Outros';
+    }
   };
 
   return { categorizarTransacao };
