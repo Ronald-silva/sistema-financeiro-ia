@@ -3,10 +3,11 @@ import { getTransactions, addTransaction, updateTransaction, deleteTransaction }
 import { toast } from 'react-toastify';
 import useAutoCategorizacao from '../hooks/useAutoCategorizacao';
 import useAIFinancialAssistant from '../hooks/useAIFinancialAssistant';
+import EmergencyFund from '../components/EmergencyFund';
+import DollarAnalysis from '../components/DollarAnalysis';
 import InvestmentTracker from '../components/InvestmentTracker';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, Legend, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
 
-// Componente para os botões de ação
 const ActionButton = ({ type, onClick, children }) => {
   const buttonStyles = {
     edit: "inline-flex items-center px-3 py-1.5 text-sm font-medium rounded-md transition-colors mr-2 bg-amber-500 hover:bg-amber-600 text-white shadow-sm",
@@ -22,7 +23,6 @@ const ActionButton = ({ type, onClick, children }) => {
   );
 };
 
-// Componente para o card de estatísticas
 const StatCard = ({ title, value, type }) => (
   <div className="bg-white rounded-lg shadow-sm p-6">
     <h3 className="text-gray-500 text-sm font-medium">{title}</h3>
@@ -36,7 +36,11 @@ function Dashboard() {
   const [transactions, setTransactions] = useState([]);
   const [loading, setLoading] = useState(true);
   const [isEditing, setIsEditing] = useState(false);
-  const [currentTransaction, setCurrentTransaction] = useState({ description: '', amount: '' });
+  const [currentTransaction, setCurrentTransaction] = useState({ 
+    description: '', 
+    amount: '', 
+    isEmergencyFund: false 
+  });
   const [financialAdvice, setFinancialAdvice] = useState('');
   const [loadingAdvice, setLoadingAdvice] = useState(false);
   const [balance, setBalance] = useState(0);
@@ -73,8 +77,12 @@ function Dashboard() {
     try {
       const amount = parseFloat(currentTransaction.amount);
       const type = amount >= 0 ? 'ganho' : 'gasto';
-      const category = await categorizarTransacao(currentTransaction.description, amount, type);
+      let category = await categorizarTransacao(currentTransaction.description, amount, type);
       
+      if (currentTransaction.isEmergencyFund) {
+        category = 'Fundo Emergencial';
+      }
+
       const transactionData = {
         ...currentTransaction,
         amount: amount,
@@ -92,7 +100,7 @@ function Dashboard() {
       }
       
       setIsEditing(false);
-      setCurrentTransaction({ description: '', amount: '' });
+      setCurrentTransaction({ description: '', amount: '', isEmergencyFund: false });
       await fetchTransactions();
     } catch (error) {
       toast.error('Erro ao salvar transação.');
@@ -102,7 +110,10 @@ function Dashboard() {
 
   const handleEdit = (transaction) => {
     setIsEditing(true);
-    setCurrentTransaction(transaction);
+    setCurrentTransaction({
+      ...transaction,
+      isEmergencyFund: transaction.category === 'Fundo Emergencial'
+    });
   };
 
   const handleDelete = async (id) => {
@@ -143,26 +154,46 @@ function Dashboard() {
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
       <div className="mb-8">
         <h1 className="text-3xl font-bold text-gray-900 mb-6">Dashboard Financeiro</h1>
-        
-        {/* Formulário de transação */}
+
+        {/* Formulário de Transação */}
         <div className="bg-white rounded-lg shadow-sm p-6 mb-8">
-          <h2 className="text-xl font-semibold mb-4">{isEditing ? 'Editar' : 'Adicionar'} Transação</h2>
-          <form onSubmit={handleAddOrUpdateTransaction} className="space-y-4">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <form onSubmit={handleAddOrUpdateTransaction}>
+            <div className="mb-4">
+              <label className="flex items-center">
+                <input
+                  type="checkbox"
+                  checked={currentTransaction.isEmergencyFund}
+                  onChange={(e) => setCurrentTransaction({
+                    ...currentTransaction,
+                    isEmergencyFund: e.target.checked
+                  })}
+                  className="form-checkbox h-4 w-4 text-blue-600"
+                />
+                <span className="ml-2 text-gray-700">Transação do Fundo Emergencial</span>
+              </label>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
               <input
                 type="text"
                 value={currentTransaction.description}
-                onChange={(e) => setCurrentTransaction({ ...currentTransaction, description: e.target.value })}
+                onChange={(e) => setCurrentTransaction({
+                  ...currentTransaction,
+                  description: e.target.value
+                })}
                 placeholder="Descrição da transação"
-                className="w-full p-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                className="w-full p-2 border border-gray-300 rounded-md"
                 required
               />
               <input
                 type="number"
                 value={currentTransaction.amount}
-                onChange={(e) => setCurrentTransaction({ ...currentTransaction, amount: e.target.value })}
+                onChange={(e) => setCurrentTransaction({
+                  ...currentTransaction,
+                  amount: e.target.value
+                })}
                 placeholder="Valor (positivo para ganho, negativo para gasto)"
-                className="w-full p-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                className="w-full p-2 border border-gray-300 rounded-md"
                 required
               />
             </div>
@@ -172,7 +203,7 @@ function Dashboard() {
           </form>
         </div>
 
-        {/* Cards de estatísticas */}
+        {/* Cards de Estatísticas */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
           <StatCard
             title="Balanço Atual"
@@ -191,6 +222,19 @@ function Dashboard() {
           />
         </div>
 
+        {/* Fundo Emergencial */}
+        <div className="mb-8">
+          <EmergencyFund 
+            transactions={transactions}
+            balance={balance}
+          />
+        </div>
+
+        {/* Análise do Dólar */}
+        <div className="mb-8">
+          <DollarAnalysis />
+        </div>
+
         {/* Gráficos */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
           <div className="bg-white rounded-lg shadow-sm p-6">
@@ -205,12 +249,12 @@ function Dashboard() {
                   cx="50%"
                   cy="50%"
                   labelLine={false}
-                  outerRadius={100}
+                  outerRadius={80}
                   fill="#8884d8"
                   dataKey="value"
                 >
-                  {COLORS.map((color, index) => (
-                    <Cell key={`cell-${index}`} fill={color} />
+                  {[0, 1].map((entry, index) => (
+                    <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                   ))}
                 </Pie>
                 <Tooltip />
@@ -222,28 +266,11 @@ function Dashboard() {
           <InvestmentTracker />
         </div>
 
-        {/* Conselho Financeiro */}
-        <div className="bg-white rounded-lg shadow-sm p-6 mb-8">
-          <div className="flex justify-between items-center mb-4">
-            <h2 className="text-xl font-semibold">Conselho Financeiro</h2>
-            <ActionButton type="success" onClick={generateFinancialAdvice} disabled={loadingAdvice}>
-              {loadingAdvice ? 'Gerando...' : 'Gerar Conselho'}
-            </ActionButton>
-          </div>
-          {financialAdvice && (
-            <div className="bg-green-50 rounded-lg p-4">
-              <p className="whitespace-pre-wrap text-gray-800">{financialAdvice}</p>
-            </div>
-          )}
-        </div>
-
         {/* Lista de Transações */}
         <div className="bg-white rounded-lg shadow-sm p-6">
           <h2 className="text-xl font-semibold mb-4">Lista de Transações</h2>
           {loading ? (
-            <p className="text-gray-500">Carregando transações...</p>
-          ) : transactions.length === 0 ? (
-            <p className="text-gray-500">Nenhuma transação encontrada.</p>
+            <p>Carregando transações...</p>
           ) : (
             <div className="space-y-4">
               {transactions.map((transaction) => (
@@ -260,6 +287,11 @@ function Dashboard() {
                     }`}>
                       {transaction.amount >= 0 ? 'Ganho' : 'Gasto'}
                     </span>
+                    {transaction.category === 'Fundo Emergencial' && (
+                      <span className="ml-2 px-2 py-1 text-sm bg-blue-100 text-blue-800 rounded-full">
+                        Fundo Emergencial
+                      </span>
+                    )}
                   </div>
                   <div className="flex space-x-2">
                     <ActionButton type="edit" onClick={() => handleEdit(transaction)}>
